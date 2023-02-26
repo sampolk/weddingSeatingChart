@@ -1,22 +1,29 @@
+% TODO: 
+%   - Add in sibling affinity
+%   - Make sure couples/parties aren't split up
+%   - Model family politics
+
 %% Load and preprocess data 
 
 dataManipulation
 
 %% Set parameters for seating chart
 
-maxPeoplePerTable = 10;
-minPeoplePerTable = 8;
+maxNumPeoplePerTable = 10;
+minNumPeoplePerTable = 9;
 
 %% Set scores for like family, unit, side, generation, and status
 
-familyScore = 3; % We add this affinity to a pair of individuals if they come from the same family
+familyScore = 5; % We add this affinity to a pair of individuals if they come from the same family
 unitScore = 2; % We add this affinity to a pair of individuals if they come from the same "unit"
 sideScore = 1; % We add this affinity to a pair of individuals if they come from the same side of the aisle (or from both)
 statusScore = 4; % We add this affinity to a pair of individuals if they come from the same family
-genScore = 2; % We add this affinity to a pair of individuals if they come from the same generation
+genScore = 2; % We add this affinity to a pair of individuals if they come from the same generation 
 
 %% Build matrix
-% This matrix encodes a complete graph with edge weight  
+% This matrix encodes a complete graph, with each pair of wedding attendees
+% being weighted according to their likelihood to enjoy each other's
+% company. 
 
 numGuests = height(T);
 
@@ -47,34 +54,26 @@ for i = 1:numGuests
     matrix(i,i) = 0; % Make it so that each person is not connected to themself
 end
 
-%% Delte intra-party edges
-
+%% Ensure that people from same party are seated together
+% --- Weight intra-party edges really high
 for party = 1:length(unique(T.partyNums))
-
-    % Look for all people who are in this party. We will force these people
-    % to sit together by deleting edges of all but the most-connected
-    % individual. 
-
     thisParty = find(T.partyNums == party);
-    
-    matrixSubset = matrix(thisParty,thisParty);
-    [~,idx] = max(sum(matrixSubset)); % Most connected person in party 
-    matrixSubset(setdiff(2:end, idx),setdiff(2:end, idx)) = 0; % Make other people in party only connected to that person
-  
-end
+    matrix(thisParty,thisParty) = 100;
+end 
 
 %% Separate guests into tables 
 
 [V,D] = eig(matrix./sum(matrix));
 [lambda,idx] = sort(abs(diag(D)), 'descend');  
 
-numTables = ceil(height(T)/maxPeoplePerTable);
+numTables = ceil(height(T)/maxNumPeoplePerTable);
 
-[labels,centroids] = constrainedKMeans(V(:,1:numTables), numTables, minPeoplePerTable*ones(numTables,1), 100);
+[labels,centroids] = constrainedKMeans(V(:,1:numTables), numTables, minNumPeoplePerTable*ones(numTables,1), maxNumPeoplePerTable*ones(numTables,1), 20);
 
-%%      
+%% Visualize seating chart
 seatingChart = cell(numTables,1);
 for table = 1:numTables
-    seatingChart{table} = T.name{find(labels == table)};
+    disp(["Table ", num2str(table)])
+    disp(T.name(labels == table));
 end
 

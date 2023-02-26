@@ -1,4 +1,4 @@
-function [labels,centroids] = constrainedKMeans(X, K, tau, maxiter)
+function [labels,centroids] = constrainedKMeans(X, K, lb, ub, maxiter)
 %{
 Implements the constrained K-Means algorithm. This algorithm is a
 balance-driven version of the canonical K-Means clustering algorithm. It
@@ -10,8 +10,10 @@ Inputs:
     - X:        Data matrix with shape (n,D), where X(i,:) is the ith data 
                 point in the dataset. 
     - K:        Desired number of clusters (integer greater than 1). 
-    - tau:      length-K vector of integers greater than 1, with tau(k)  
+    - lb:       length-K vector of integers greater than 1, with tau(k)  
                 storing the minimum number of data points in cluster k. 
+    - ub:       length-K vector of integers greater than 1, with tau(k)  
+                storing the maximum number of data points in cluster k. 
     - maxiter:  Maximum number of iterations.
 Outputs:
     labels:     Unsupervised cluster labels. labels(i) = k iff data point 
@@ -19,14 +21,16 @@ Outputs:
     centroids:  Matrix with shape (K,D), where centroids(k,:) is the 
                 centroid of data points with label=k in labels. 
 Written by Sam Polk (MITLL, 03-39) on 9/8/22. 
+Edited by Sam Polk (MITLL, 03-39) on 2/26/23 to allow for upper bound.
 %}
 % Extract dataset size information
 [n,D] = size(X);
 % Parse inputs to algorithm
 if nargin == 2
-    tau = min(0.05*n, 0.5*n/K);
+    lb = min(0.05*n, 0.5*n/K)*ones(K,1);
+    ub = Inf*ones(K,1);
     maxiter = 100;
-elseif nargin == 3
+elseif nargin == 4
     maxiter=100;
 end
 % Assign initial clusters and centroids
@@ -50,13 +54,18 @@ while iter<maxiter
     A2 = sparse(repmat((1:n)',1,K),  reshape(1:K*n, [n,K]), -ones(n, K));
     b2 = -ones(n,1); 
     % Enforce minimum cluster size constraint:
-    % A2 has exactly n*K nonzero entries in a (K,n*K) matrix.
+    % A3 has exactly n*K nonzero entries in a (K,n*K) matrix.
     A3 = sparse(reshape(repmat((1:K)', 1,n)', [n*K,1]),1:n*K, -ones(1,n*K)); 
-    b3 = -tau; 
+    b3 = -lb; 
+    % Enforce maximum cluster size constraint:
+    % A4 has exactly n*K nonzero entries in a (K,n*K) matrix.
+    A4 = sparse(reshape(repmat((1:K)', 1,n)', [n*K,1]),1:n*K, ones(1,n*K)); 
+    b4 = ub; 
+ 
     % Run linear program to get new cluster assignments
-    T = intlinprog(objectiveFunction, 1:n*K, [A1; A2; A3], [b1; b2; b3], [], [], zeros(n*K,1), ones(n*K,1));
+    T = intlinprog(objectiveFunction, 1:n*K, [A1; A2; A3; A4], [b1; b2; b3; b4], [], [], zeros(n*K,1), ones(n*K,1));
     [~, labelsNew] = max(reshape(T,n,K), [], 2);
-    % Assign new centroids: 
+    % Assign new centroids:  
     centroidsNew = zeros(K,D);
     for k = 1:K
         centroidsNew(k,:) = mean(X(labelsNew == k,:));
