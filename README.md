@@ -10,7 +10,7 @@ My implementation of Constrained Spectral Clustering for wedding seating chart c
   
 The resulting seating chart will consist of high intra-table affinity (i.e., I expect that any two guests assigned to the same table will enjoy each other's company). To replicate my results, please run `buildAffinityMatrix.m` with the Optimization toolbox in MATLAB. If you want to use this for any academic work, please cite it as follows: 
 
- Polk, S. L. (2023). Wedding Seating Chart Optimization. Retrieved [Date], from https://github.com/sampolk/weddingSeatingChart. 
+ - Polk, S. L. (2023). Wedding Seating Chart Optimization. Retrieved [Date], from https://github.com/sampolk/weddingSeatingChart. 
 
 I relied on the following resources for this project. Please cite them (and this project) if you use this code (even if not for your own wedding). 
  1. Bradley, P. S., Bennett, K. P., & Demiriz, A. (2000). _Constrained k-means clustering_. Microsoft Research, Redmond, 20(0), 0.
