@@ -16,11 +16,13 @@ numTables = ceil(height(T)/maxNumPeoplePerTable); % Ensure that everyone can sit
 
 %% Set scores for like family, unit, side, generation, and status
 
-familyScore = 4; % We add this affinity to a pair of individuals if they come from the same family
-unitScore = 3; % We add this affinity to a pair of individuals if they come from the same "unit"
+familyScore = 6; % We add this affinity to a pair of individuals if they come from the same family
+unitScore = 2; % We add this affinity to a pair of individuals if they come from the same "unit", which is 1 level higher in the family tree
 sideScore = 1; % We add this affinity to a pair of individuals if they come from the same side of the aisle (or from both)
-statusScore = 6; % We add this affinity to a pair of individuals if they come from the same status
-genScore = 1; % We add this affinity to a pair of individuals if they come from the same generation 
+statusScore = 10; % We add this affinity to a pair of individuals if they come from the same status (group of like invited wedding guests)
+genScore = 4; % We add this affinity to a pair of individuals if they come from the same generation 
+
+partyScore = 1000; % We add this much to a pair of inviduals' affinity if they come from the same party (i.e., couple or family)
 
 %% Build matrix
 % This matrix encodes a complete graph, with each pair of wedding attendees
@@ -36,16 +38,16 @@ for i = 1:numGuests
         % First, add familyScore if guests i and j have same family. 
         matrix(i,j) = familyScore*(T.familyNums(i) == T.familyNums(j));
 
-        % First, add unitScore if guests i and j have same unit. 
+        % Next, add unitScore if guests i and j have same unit. 
         matrix(i,j) = matrix(i,j) + unitScore*(T.unitNums(i) == T.unitNums(j));
 
-        % First, add sideScore if guests i and j have same side 
+        % Next, add sideScore if guests i and j have same side 
         % (or if one of them comes from both)
         if T.sideNums(i) == T.sideNums(j) || T.sideNums(i) == sideDict("Both") || T.sideNums(j) == sideDict("Both")
             matrix(i,j) = matrix(i,j) + sideScore;
         end
 
-        % First, add statusScore if guests i and j have same status. 
+        % Next, add statusScore if guests i and j have same status. 
         matrix(i,j) = matrix(i,j) + statusScore*(T.statusNums(i) == T.statusNums(j));
 
         % First, add genScore if guests i and j have same generation. 
@@ -57,9 +59,10 @@ end
 
 %% Ensure that people from same party are seated together
 % --- Weight intra-party edges really high
+% TODO: Maybe we can turn this into a constraint instead.  n
 for party = 1:length(unique(T.partyNums))
     thisParty = find(T.partyNums == party);
-    matrix(thisParty,thisParty) = 100;
+    matrix(thisParty,thisParty) =  partyScore;
 end 
 
 %% Separate guests into tables using constrained spectral clustering
@@ -106,15 +109,18 @@ while iter<20
     A3 = sparse(reshape(repmat((1:numTables)', 1,numGuests)', [numGuests*numTables,1]),1:numGuests*numTables, -ones(1,numGuests*numTables)); 
     b3 = -minNumPeoplePerTable*ones(numTables,1); 
 
-    % Finally, we ensure that each table is assigned at most maxTableSize
+    % Next, we ensure that each table is assigned at most maxTableSize
     % guests 
     A4 = sparse(reshape(repmat((1:numTables)', 1,numGuests)', [numGuests*numTables,1]),1:numGuests*numTables, ones(1,numGuests*numTables)); 
     b4 = maxNumPeoplePerTable*ones(numTables,1); 
 
+    % Next, we ensure that each party is assigned to the same table
+    [A5, b5] = buildIntraPartyConstraint(T.partyNums, numTables);
+
     % Now that we have our constraints, let's optimize using mixed-integer
     % linear programming. This gives us table assignments satisfying the
     % above constraints
-    output = intlinprog(objectiveFunction, 1:numGuests*numTables, [A1; A2; A3; A4], [b1; b2; b3; b4], [], [], zeros(numGuests*numTables,1), ones(numGuests*numTables,1));
+    output = intlinprog(objectiveFunction, 1:numGuests*numTables, [A1; A2; A3; A4; A5], [b1; b2; b3; b4; b5], [], [], zeros(numGuests*numTables,1), ones(numGuests*numTables,1));
     [~, labelsNew] = max(reshape(output,numGuests,numTables), [], 2);
 
     % Now that we have our new labels, let's update our centroids. 
@@ -146,4 +152,10 @@ for table = 1:numTables
     disp(["Table ", num2str(table)])
     disp(T.name(labels == table));
 end
+
+%% Constraint to ensure people from same party are in same table
+[A,b] = buildIntraPartyConstraint(T.partyNums, numTables);
+
+A*output;
+
 

@@ -79,8 +79,18 @@ for i = 1:height(T)
 end
 T.statusNums = statusNums;
 
+%% Sibling Unit Identification
+% Goal: identify each person's belonging to a sibling group. 
+
+sibsDict = dictionary(string(unique(T.SiblingGroup))', 1:length(unique(T.SiblingGroup)));
+
+siblingNums = zeros(height(T),1);
+for i = 1:height(T)
+    siblingNums(i) = sibsDict(T.SiblingGroup(i));
+end
+T.siblingNums = siblingNums;
+
 
 %% Delete unused variables 
 
-T = removevars(T, ["Party","Family","Unit","Side","Generation","Status","State", "FirstName", "LastName"]);
- 
+T = removevars(T, ["Party","Family","Unit","Side","Generation","Status","State", "FirstName", "LastName", "SiblingGroup"]);
